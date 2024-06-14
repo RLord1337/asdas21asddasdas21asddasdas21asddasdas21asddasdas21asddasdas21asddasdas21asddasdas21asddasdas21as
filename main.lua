@@ -6,13 +6,16 @@ if not speaker then
 end
 
 local decoder = dfpwm.make_decoder()
-local file, err = io.open("VillagerNLoud.dfpwm", "rb")
+local file = fs.open("VillagerNLoud.dfpwm", "rb")
 
 if not file then
-    error("Failed to open file: " .. err)
+    error("Failed to open file")
 end
 
-for chunk in file:lines(16 * 1024) do
+while true do
+    local chunk = file.read(16 * 1024)
+    if not chunk then break end
+
     local buffer = decoder(chunk)
 
     while not speaker.playAudio(buffer) do
@@ -20,4 +23,4 @@ for chunk in file:lines(16 * 1024) do
     end
 end
 
-file:close()
+file.close()
