@@ -44,19 +44,47 @@ local function playFile(fileName)
     stopPlayback = false
 
     while true do
-        local chunk = file.read(16 * 1024)
-        if not chunk or stopPlayback then
-            break
-        end
+        -- Check for user input or timer event every 0.1 seconds
+        local timerId = os.startTimer(0.1)
+        local event, param = os.pullEvent()
+        os.cancelTimer(timerId)
 
-        local buffer = decoder(chunk)
-        
-        for _, speaker in ipairs(speakers) do
-            while not speaker.playAudio(buffer) do
-                if stopPlayback then break end
-                os.pullEvent("speaker_audio_empty")
+        if event == "char" then
+            local char = param
+            if char == 's' then
+                if isPlaying then
+                    stopAudio()
+                    print("Playback stopped.")
+                else
+                    print("No audio is playing.")
+                end
+                break
+            else
+                local selection = tonumber(char)
+                if selection and dfpwmFiles[selection] then
+                    local selectedFile = dfpwmFiles[selection]
+                    print("Playing " .. selectedFile)
+                    playFile(selectedFile)
+                else
+                    print("Invalid selection.")
+                end
             end
-            if stopPlayback then break end
+        elseif event == "timer" and param == timerId then
+            -- Continue playback
+            local chunk = file.read(16 * 1024)
+            if not chunk or stopPlayback then
+                break
+            end
+
+            local buffer = decoder(chunk)
+            
+            for _, speaker in ipairs(speakers) do
+                while not speaker.playAudio(buffer) do
+                    if stopPlayback then break end
+                    os.pullEvent("speaker_audio_empty")
+                end
+                if stopPlayback then break end
+            end
         end
     end
 
