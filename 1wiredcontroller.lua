@@ -47,7 +47,7 @@ local function playAudio(fileName, speakers)
         local buffer = decoder(chunk)
         
         for _, speaker in pairs(speakers) do
-            while not speaker.playAudio(buffer) do
+            while not speaker.playAudio(buffer, 0.1) do
                 os.pullEvent("speaker_audio_empty")
             end
         end
