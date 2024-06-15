@@ -1,5 +1,6 @@
 local dfpwm = require("cc.audio.dfpwm")
 
+-- Function to list DFPWM files in root directory
 local function listAudioFiles()
     local files = fs.list("/")
     local audioFiles = {}
@@ -13,6 +14,7 @@ local function listAudioFiles()
     return audioFiles
 end
 
+-- Function to display menu and get user input
 local function displayMenu(audioFiles, queue)
     term.clear()
     term.setCursorPos(1, 1)
@@ -27,15 +29,15 @@ local function displayMenu(audioFiles, queue)
         print(i .. ". " .. file)
     end
     
-    print("\nType 'shuffle' to shuffle queue.")
+    print("\nType 'remove' to remove a song from queue.")
     print("Type 'play' to play queue.")
-    print("Type 'loop' to toggle loop mode.")
     print("Type 'exit' to exit.")
     
     local input = read()
     return input
 end
 
+-- Function to play audio from file
 local function playAudio(fileName)
     local speakers = peripheral.find("speaker")
     local decoder = dfpwm.make_decoder()
@@ -65,30 +67,17 @@ local function playAudio(fileName)
     print("Playback finished.")
 end
 
-local function playQueue(queue, loopMode)
-    while true do
-        for _, fileName in ipairs(queue) do
-            print("Playing: " .. fileName)
-            playAudio(fileName)
-            sleep(1)  -- Pause briefly between songs
-            
-            if not loopMode and _ == #queue then
-                return  -- Exit function if not in loop mode and reached end of queue
-            end
-        end
-    end
-end
-
-local function shuffleQueue(queue)
-    for i = #queue, 2, -1 do
-        local j = math.random(i)
-        queue[i], queue[j] = queue[j], queue[i]
+-- Function to play songs in queue
+local function playQueue(queue)
+    for _, fileName in ipairs(queue) do
+        print("Playing: " .. fileName)
+        playAudio(fileName)
+        sleep(1)  -- Pause briefly between songs
     end
 end
 
 -- Main program
 local queue = {}
-local loopMode = false
 
 while true do
     local audioFiles = listAudioFiles()
@@ -98,19 +87,26 @@ while true do
         break
     elseif userInput == 'play' then
         if #queue > 0 then
-            playQueue(queue, loopMode)
+            playQueue(queue)
         else
             print("Queue is empty. Add songs to the queue.")
             sleep(1)  -- Pause briefly
         end
-    elseif userInput == 'shuffle' then
-        shuffleQueue(queue)
-        print("Queue shuffled.")
-        sleep(1)  -- Pause briefly
-    elseif userInput == 'loop' then
-        loopMode = not loopMode
-        print("Loop mode " .. (loopMode and "enabled" or "disabled") .. ".")
-        sleep(1)  -- Pause briefly
+    elseif userInput == 'remove' then
+        if #queue > 0 then
+            print("Enter the number of the song to remove:")
+            local removeIndex = tonumber(read())
+            if removeIndex and removeIndex >= 1 and removeIndex <= #queue then
+                local removedFile = table.remove(queue, removeIndex)
+                print("Removed from queue: " .. removedFile)
+            else
+                print("Invalid selection.")
+                sleep(1)  -- Pause briefly
+            end
+        else
+            print("Queue is empty. No songs to remove.")
+            sleep(1)  -- Pause briefly
+        end
     elseif tonumber(userInput) and audioFiles[tonumber(userInput)] then
         local selectedFile = audioFiles[tonumber(userInput)]
         print("Added to queue: " .. selectedFile)
