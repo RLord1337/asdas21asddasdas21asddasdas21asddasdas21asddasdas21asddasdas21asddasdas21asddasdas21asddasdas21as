@@ -1,12 +1,17 @@
-local speaker = peripheral.find("speaker")
-local file = fs.open("VillagerNLoud.dfpwm, "rb")
+local modem = peripheral.find("modem")
+local speakers = {peripheral.find("speaker")}
 
-while true do
-  local bytes = file.read(16384)
-  if not bytes then return end
-  speaker.playAudio(bytes)
+if modem then
+    print("Modem found")
+else
+    print("No modem found")
+end
 
-  -- Alternatively, make playAudio block until its buffer is empty, meaning
-  -- we can drop this line.
-  repeat local _, name = os.pullEvent("need_audio") until name == peripheral.getName(speaker)
+if #speakers > 0 then
+    for i, speaker in pairs(speakers) do
+        print("Playing note on speaker " .. i)
+        speaker.playNote("pling")
+    end
+else
+    print("No speakers found")
 end
