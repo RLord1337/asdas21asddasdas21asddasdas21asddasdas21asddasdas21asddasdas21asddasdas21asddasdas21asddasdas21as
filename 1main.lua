@@ -1,106 +1,106 @@
 local dfpwm = require("cc.audio.dfpwm")
-local speakers = {peripheral.find("speaker")}
+local fs = require("fs")
+local speaker = peripheral.find("speaker")
 local decoder = dfpwm.make_decoder()
-local running = false
-local currentPlayback
-local queue = {}
 
-if #speakers == 0 then
-    print("No speakers found")
+if not speaker then
+    print("No speaker found")
     return
 end
 
-local function listFiles()
+local function list_files()
     local files = fs.list("")
-    local dfpwmFiles = {}
+    local dfpwm_files = {}
     for _, file in ipairs(files) do
-        if file:sub(-6) == ".dfpwm" then
-            table.insert(dfpwmFiles, file)
+        if file:match("%.dfpwm$") then
+            table.insert(dfpwm_files, file)
         end
     end
-    return dfpwmFiles
+    return dfpwm_files
 end
 
-local function playFile(filename)
-    local file = fs.open(filename, "rb")
-    if not file then
-        print("Audio file not found")
+local function draw_gui(files, selected, is_playing)
+    term.clear()
+    term.setCursorPos(1, 1)
+    print("DFPWM Player")
+    print("Select a file to play:")
+    for i, file in ipairs(files) do
+        if i == selected then
+            print("> " .. file)
+        else
+            print("  " .. file)
+        end
+    end
+    if is_playing then
+        print("\nPlaying: " .. files[selected])
+        print("[Stop]")
+    else
+        print("\n[Play]")
+    end
+    print("[Exit]")
+end
+
+local function play_file(file)
+    local file_handle = fs.open(file, "rb")
+    if not file_handle then
+        print("Failed to open file: " .. file)
         return
     end
 
-    running = true
-    while running do
-        local chunk = file.read(16 * 1024)
+    while true do
+        local chunk = file_handle.read(16 * 1024)
         if not chunk then
             break
         end
 
         local buffer = decoder(chunk)
-        
-        for _, speaker in pairs(speakers) do
-            while not speaker.playAudio(buffer) do
-                os.pullEvent("speaker_audio_empty")
-            end
+        while not speaker.playAudio(buffer) do
+            os.pullEvent("speaker_audio_empty")
         end
     end
 
-    file.close()
-    running = false
+    file_handle.close()
 end
 
-local function stopPlayback()
-    running = false
-    if currentPlayback then
-        currentPlayback.terminate()
+local function gui_thread()
+    local files = list_files()
+    if #files == 0 then
+        print("No DFPWM files found")
+        return
     end
-end
 
-local function drawGUI()
-    term.clear()
-    term.setCursorPos(1, 1)
-    print("DFPWM Player")
-    print("------------")
-    print("Files:")
-    local files = listFiles()
-    for i, file in ipairs(files) do
-        print(i .. ". " .. file)
-    end
-    print("------------")
-    print("Queue:")
-    for i, file in ipairs(queue) do
-        print(i .. ". " .. file)
-    end
-    print("------------")
-    print("[Play] [Stop] [Add to Queue] [Clear Queue]")
-end
+    local selected = 1
+    local is_playing = false
+    local play_thread = nil
 
-local function handleUserInput()
+    draw_gui(files, selected, is_playing)
+
     while true do
-        drawGUI()
-        local event, button, x, y = os.pullEvent("mouse_click")
-        if y == 18 then
-            if x >= 1 and x <= 5 then
-                if #queue > 0 then
-                    local filename = table.remove(queue, 1)
-                    if currentPlayback then
-                        currentPlayback.terminate()
-                    end
-                    currentPlayback = parallel.waitForAny(function() playFile(filename) end)
+        local event, key = os.pullEvent("key")
+        if key == keys.up then
+            selected = (selected - 2) % #files + 1
+        elseif key == keys.down then
+            selected = selected % #files + 1
+        elseif key == keys.enter then
+            if is_playing then
+                if play_thread then
+                    play_thread = nil
                 end
-            elseif x >= 7 and x <= 11 then
-                stopPlayback()
-            elseif x >= 13 and x <= 23 then
-                print("Enter file number to add to queue:")
-                local input = read()
-                local fileIndex = tonumber(input)
-                if fileIndex and fileIndex > 0 and fileIndex <= #listFiles() then
-                    table.insert(queue, listFiles()[fileIndex])
-                end
-            elseif x >= 25 and x <= 35 then
-                queue = {}
+                is_playing = false
+            else
+                play_thread = parallel.waitForAny(function() play_file(files[selected]) end)
+                is_playing = true
             end
+        elseif key == keys.e then
+            return
         end
+        draw_gui(files, selected, is_playing)
     end
 end
 
-parallel.waitForAny(handleUserInput)
+local function stop_audio()
+    -- This function will set the play_thread to nil to stop playback
+    -- Needs a mechanism to actually stop the playback thread
+end
+
+parallel.waitForAll(gui_thread)
